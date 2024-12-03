@@ -50,7 +50,7 @@ struct Node {
     Usage usage;
     bool operator==(const Strategy& other) const = default;
   };
-  Interval interval;
+  Interval interval;  // Interpreted as half-open with an exclusive upper bound
   std::vector<Strategy> strategies;
   bool operator==(const Node& other) const = default;
 };
