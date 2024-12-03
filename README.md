@@ -10,7 +10,7 @@ $ ./iopddl example.json 10
 
 ## Decompressing Benchmarks
 
-In order to try out the contest problems, run this command one time:
+In order to try out the contest problems, you'll first need to run this command one time:
 
 ```
 $ gzip -d benchmarks/*
