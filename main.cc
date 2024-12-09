@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 #include <cstdlib>
+#include <iostream>
 #include <string>
 
 #include "absl/strings/str_join.h"
