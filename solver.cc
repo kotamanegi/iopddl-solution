@@ -18,6 +18,7 @@ limitations under the License.
 
 #include <stdlib.h>
 
+#include <iostream>
 #include <optional>
 
 #include "iopddl.h"
