@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
   const auto problem = iopddl::ReadProblem(filename);
   if (!problem.ok()) exit(1);
   const auto solution = iopddl::Solver().Solve(*problem, timeout);
-  if (!solution.ok()) exit(1);
-  std::cout << "[" << absl::StrJoin(*solution, ", ") << "]" << std::endl;
+  const auto result = solution.value_or(iopddl::Solution{});
+  std::cout << "[" << absl::StrJoin(result, ", ") << "]" << std::endl;
   return 0;
 }
