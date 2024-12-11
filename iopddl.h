@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef IOPDDL_H_
-#define IOPDDL_H_
+#ifndef IOPDDL_IOPDDL_H_
+#define IOPDDL_IOPDDL_H_
 
 #include <cstdint>
 #include <optional>
@@ -81,4 +81,4 @@ absl::StatusOr<Problem> ReadProblem(const std::string& filename);
 
 }  // namespace iopddl
 
-#endif  // IOPDDL_H_
+#endif  // IOPDDL_IOPDDL_H_
