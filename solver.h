@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#ifndef SOLVER_H
-#define SOLVER_H
+#ifndef IOPDDL_SOLVER_H
+#define IOPDDL_SOLVER_H
 
 #include <optional>
 
@@ -34,4 +34,4 @@ class Solver {
 
 }  // namespace iopddl
 
-#endif  // SOLVER_H
+#endif  // IOPDDL_SOLVER_H
