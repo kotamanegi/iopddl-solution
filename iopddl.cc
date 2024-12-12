@@ -102,7 +102,7 @@ absl::StatusOr<Problem> ReadProblem(const std::string& filename) {
   for (EdgeIdx edge_idx = 0; edge_idx < problem.edges.size(); ++edge_idx) {
     Edge& edge = problem.edges[edge_idx];
     for (const Cost cost : edges["costs"][edge_idx]) {
-      edge.strategies.push_back({.cost = cost});
+      edge.strategies.push_back({.cost = cost, .usage = 0});
     }
   }
   if (data["problem"].contains("usage_limit")) {
