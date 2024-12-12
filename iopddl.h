@@ -39,17 +39,18 @@ using TimeIdx = int64_t;
 using NodeIdx = int64_t;
 using EdgeIdx = int64_t;
 using StrategyIdx = int64_t;
+using Interval = std::pair<TimeIdx, TimeIdx>;
 using Solution = std::vector<StrategyIdx>;
 using TotalUsage = absl::int128;
 using TotalCost = absl::int128;
 
+struct Strategy {
+  Cost cost;
+  Usage usage;
+  bool operator==(const Strategy& other) const = default;
+};
+
 struct Node {
-  using Interval = std::pair<TimeIdx, TimeIdx>;
-  struct Strategy {
-    Cost cost;
-    Usage usage;
-    bool operator==(const Strategy& other) const = default;
-  };
   Interval interval;  // Interpreted as half-open with an exclusive upper bound
   std::vector<Strategy> strategies;
   bool operator==(const Node& other) const = default;
@@ -57,10 +58,6 @@ struct Node {
 
 struct Edge {
   using Nodes = std::vector<NodeIdx>;
-  struct Strategy {
-    Cost cost;
-    bool operator==(const Strategy& other) const = default;
-  };
   Nodes nodes;
   std::vector<Strategy> strategies;
   bool operator==(const Edge& other) const = default;
