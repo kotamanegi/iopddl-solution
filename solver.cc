@@ -22,6 +22,7 @@ limitations under the License.
 #include <optional>
 
 #include "iopddl.h"
+#include "kotamanegi_structs.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
@@ -30,29 +31,38 @@ limitations under the License.
 
 namespace iopddl {
 
-////////////////////////////////////////////////////////////////////////////////
-//  A simple solver that generates random solutions until the given timeout.  //
-//  Contest participants SHOULD replace this implementation with their own!!  //
-////////////////////////////////////////////////////////////////////////////////
-
-absl::StatusOr<Solution> Solver::Solve(const Problem& problem,
+absl::StatusOr<Solution> Solver::Solve(const Problem& _problem,
                                        absl::Duration timeout) {
   const absl::Time start_time = absl::Now();
   std::optional<TotalCost> best_cost;
   std::optional<Solution> best_solution;
   unsigned int seed = 2025;
+
+  // We modify problem instance for simpler expression.
+  ProblemInstance problem = convertToProblemInstance(_problem);
+
   while (absl::Now() - start_time < timeout) {
     Solution solution;
-    solution.reserve(problem.nodes.size());
-    for (const Node& node : problem.nodes) {
-      solution.push_back(rand_r(&seed) % node.strategies.size());
+    solution.reserve(problem.vertexs.size());
+
+    int counter = 0;
+    for (const Vertex& node : problem.vertexs) {
+      int min_itr = 0;
+      counter += node.selectables.size();
+      for(int i = 0; i < node.selectables.size(); i++) {
+        if(node.selectables[i].usage < node.selectables[min_itr].usage) {
+          min_itr = i;
+        }
+      }
+      solution.push_back(min_itr);
     }
-    auto cost = Evaluate(problem, solution);
+    auto cost = FastEvaluate(problem, solution);
     if (!cost.ok() || (best_cost && *best_cost <= *cost)) {
       continue;
     }
     std::cout << "# Found solution [" << absl::StrJoin(solution, ", ")
               << "] with cost " << *cost << std::endl;;
+    
     best_cost = *cost;
     best_solution = solution;
   }

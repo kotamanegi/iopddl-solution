@@ -26,6 +26,7 @@ add_executable(iopddl
   iopddl.cc
   main.cc
   solver.cc
+  kotamanegi_structs.cc
 )
 target_link_libraries(iopddl -static
   absl::numeric
@@ -40,6 +41,7 @@ add_executable(iopddl_test
   iopddl_test.cc
   iopddl.cc
   solver.cc
+  kotamanegi_structs.cc
 )
 target_link_libraries(iopddl_test -static
   GTest::gmock_main
