@@ -61,6 +61,7 @@ struct ProblemInstance {
 };
 
 ProblemInstance convertToProblemInstance(const Problem& problem);
+ProblemInstance zipTimeInterval(const ProblemInstance &problem);
 absl::StatusOr<TotalCost> FastEvaluate(const ProblemInstance& problem,
                                    const Solution& solution);
 }  // namespace iopddl

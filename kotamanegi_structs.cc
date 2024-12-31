@@ -37,6 +37,7 @@ namespace iopddl
 {
   ProblemInstance convertToProblemInstance(const Problem &problem)
   {
+    // simple conversion
     ProblemInstance instance;
     instance.name = problem.name;
     instance.usage_limit = problem.usage_limit;
@@ -80,7 +81,30 @@ namespace iopddl
         vertex1.selectables[i].connection_costs.push_back(connection_cost);
       }
     }
-    // Conversion logic here
+    return zipTimeInterval(instance);
+  }
+  ProblemInstance zipTimeInterval(const ProblemInstance &problem)
+  {
+    std::map<TimeIdx,int> time_map;
+    for (const Vertex &vertex : problem.vertexs)
+    {
+      time_map[vertex.interval.first] = 0;
+      time_map[vertex.interval.second] = 0;
+    }
+    int time_idx = 0;
+    for(auto &time : time_map){
+      time.second = time_idx++;
+    }
+    ProblemInstance instance;
+    instance.name = problem.name;
+    instance.usage_limit = problem.usage_limit;
+    for (const Vertex &vertex : problem.vertexs)
+    {
+      Vertex new_vertex;
+      new_vertex.interval = {time_map[vertex.interval.first], time_map[vertex.interval.second]};
+      new_vertex.selectables = vertex.selectables;
+      instance.vertexs.push_back(new_vertex);
+    }
     return instance;
   }
   absl::StatusOr<TotalCost> FastEvaluate(const ProblemInstance &problem,
