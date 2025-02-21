@@ -1,0 +1,7 @@
+
+# Found solution with cost: 6468000000060531501589
+# Trial/accepted: 8329/182
+# Found solution with cost: 6447000000057218611870
+# Trial/accepted: 16153/362
+# Found solution with cost: 6363000000082368859688
+# Trial/accepted: 24106/525

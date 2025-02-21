@@ -169,7 +169,7 @@ namespace iopddl
 
         // memory
         Usage usage_diff = vertex.selectables[operation.new_selection].usage - vertex.selectables[old].usage;
-        // seg.apply(vertex.interval.first, vertex.interval.second, usage_diff);
+        seg.apply(vertex.interval.first, vertex.interval.second, usage_diff);
         total_memory_usage += usage_diff * (vertex.interval.second - vertex.interval.first);
         // calculate the difference of score.
 
