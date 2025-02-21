@@ -66,8 +66,24 @@ namespace iopddl
         {
           costs.push_back(edge.strategies[i * vertex1.selectables.size() + j].cost);
         }
-        std::pair<VertexIdx, std::vector<Cost>> connection_cost = {edge.nodes[1], costs};
-        vertex0.selectables[i].connection_costs.push_back(connection_cost);
+        int ok = 0;
+        for (int j = 0; j < vertex0.selectables[i].connection_costs.size(); ++j)
+        {
+          if (vertex0.selectables[i].connection_costs[j].first == edge.nodes[1])
+          {
+            for (int t = 0; t < costs.size(); ++t)
+            {
+              vertex0.selectables[i].connection_costs[j].second[t] += costs[t];
+            }
+            ok = 1;
+            break;
+          }
+        }
+        if (ok == 0)
+        {
+          std::pair<VertexIdx, std::vector<Cost>> connection_cost = {edge.nodes[1], costs};
+          vertex0.selectables[i].connection_costs.push_back(connection_cost);
+        }
       }
 
       for (int i = 0; i < vertex1.selectables.size(); i++)
@@ -77,22 +93,39 @@ namespace iopddl
         {
           costs.push_back(edge.strategies[j * vertex1.selectables.size() + i].cost);
         }
-        std::pair<VertexIdx, std::vector<Cost>> connection_cost = {edge.nodes[0], costs};
-        vertex1.selectables[i].connection_costs.push_back(connection_cost);
+        int ok = 0;
+        for (int j = 0; j < vertex1.selectables[i].connection_costs.size(); ++j)
+        {
+          if (vertex1.selectables[i].connection_costs[j].first == edge.nodes[0])
+          {
+            for (int t = 0; t < costs.size(); ++t)
+            {
+              vertex1.selectables[i].connection_costs[j].second[t] += costs[t];
+            }
+            ok = 1;
+            break;
+          }
+        }
+        if (ok == 0)
+        {
+          std::pair<VertexIdx, std::vector<Cost>> connection_cost = {edge.nodes[0], costs};
+          vertex1.selectables[i].connection_costs.push_back(connection_cost);
+        }
       }
     }
     return zipTimeInterval(instance);
   }
   ProblemInstance zipTimeInterval(const ProblemInstance &problem)
   {
-    std::map<TimeIdx,int> time_map;
+    std::map<TimeIdx, int> time_map;
     for (const Vertex &vertex : problem.vertexs)
     {
       time_map[vertex.interval.first] = 0;
       time_map[vertex.interval.second] = 0;
     }
     int time_idx = 0;
-    for(auto &time : time_map){
+    for (auto &time : time_map)
+    {
       time.second = time_idx++;
     }
     ProblemInstance instance;
@@ -110,10 +143,11 @@ namespace iopddl
   absl::StatusOr<TotalCost> FastEvaluate(const ProblemInstance &problem,
                                          const Solution &solution)
   {
-    if (solution.size() != problem.vertexs.size()) {
+    if (solution.size() != problem.vertexs.size())
+    {
       return absl::InvalidArgumentError("Incorrect solution size");
     }
-    
+
     TotalCost cost = 0;
     // use double-cost for each selection
     for (int i = 0; i < solution.size(); i++)
@@ -129,22 +163,26 @@ namespace iopddl
     }
     cost /= 2;
 
-    if(problem.usage_limit){
+    if (problem.usage_limit)
+    {
       TimeIdx max_time = 0;
       for (const Vertex &vertex : problem.vertexs)
       {
         max_time = std::max(max_time, vertex.interval.second);
       }
       std::vector<TotalUsage> total_usages(max_time + 1);
-      for(int i = 0;i < solution.size();++i){
+      for (int i = 0; i < solution.size(); ++i)
+      {
         const Vertex &vertex = problem.vertexs[i];
         const Selection &selection = vertex.selectables[solution[i]];
         total_usages[vertex.interval.first] += selection.usage;
         total_usages[vertex.interval.second] -= selection.usage;
       }
-      for(int i = 1;i <= max_time;++i){
+      for (int i = 1; i <= max_time; ++i)
+      {
         total_usages[i] += total_usages[i - 1];
-        if(total_usages[i] > *problem.usage_limit){
+        if (total_usages[i] > *problem.usage_limit)
+        {
           return absl::ResourceExhaustedError("Usage limit exceeded");
         }
       }
