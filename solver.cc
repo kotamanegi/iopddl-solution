@@ -80,6 +80,82 @@ namespace iopddl
       this->total_memory_usage = total_memory_usage;
       this->seg_size = seg_size;
     }
+    void dfs(int node, std::vector<int> &visited)
+    {
+      visited[node] = 1;
+      // determine the best solution in the world.
+      int target_itr = 0;
+      Usage target_memory = std::numeric_limits<Usage>::max();
+      const Cost TICK = 100000000000000000;
+      for (int i = 0; i < problem.vertexs[node].selectables.size(); i++)
+      {
+        // check if valid.
+        bool is_valid = 1;
+        for (auto &x : problem.vertexs[node].selectables)
+        {
+          for (auto y : x.connection_costs)
+          {
+            if (visited[y.first] == 1)
+            {
+              if (y.second[solution[y.first]] >= TICK)
+              {
+                is_valid = 0;
+              }
+            }
+          }
+        }
+        if (!is_valid)
+        {
+          continue;
+        }
+        Usage memory = problem.vertexs[node].selectables[i].usage;
+        if (memory < target_memory)
+        {
+          target_memory = memory;
+          target_itr = i;
+        }
+      }
+      if (target_memory == std::numeric_limits<Usage>::max())
+      {
+        for (int i = 0; i < problem.vertexs[node].selectables.size(); i++)
+        {
+          Usage memory = problem.vertexs[node].selectables[i].usage;
+          if (memory < target_memory)
+          {
+            target_memory = memory;
+            target_itr = i;
+          }
+        }
+      }
+      update({Operation{node, target_itr}});
+      for (const auto &x : problem.vertexs[node].selectables[solution[node]].connection_costs)
+      {
+        if (visited[x.first] == 0)
+        {
+          dfs(x.first, visited);
+        }
+      }
+    }
+    void initialize()
+    {
+      // not used anymore.
+      return;
+      std::vector<int> visited(problem.vertexs.size(), 0);
+      int counter = 0;
+      for (int i = 0; i < problem.vertexs.size(); i++)
+      {
+        if (visited[i] == 0)
+        {
+          counter++;
+          dfs(i, visited);
+        }
+      }
+
+      check_validaty();
+      std::cout << "# counter: " << counter << std::endl;
+      std::cout << "# isitOK? :" << isValid << std::endl;
+      std::cout << "# initial cost: " << current_cost << std::endl;
+    }
     void update(std::vector<Operation> operations)
     {
       for (Operation operation : operations)
@@ -93,7 +169,7 @@ namespace iopddl
 
         // memory
         Usage usage_diff = vertex.selectables[operation.new_selection].usage - vertex.selectables[old].usage;
-        seg.apply(vertex.interval.first, vertex.interval.second, usage_diff);
+        // seg.apply(vertex.interval.first, vertex.interval.second, usage_diff);
         total_memory_usage += usage_diff * (vertex.interval.second - vertex.interval.first);
         // calculate the difference of score.
 
@@ -195,10 +271,14 @@ namespace iopddl
       State state = create_initial_state(problem);
 
       absl::Time last_updated = absl::Now();
-
       absl::Time last_output = absl::Now();
+
+      int trial = 0;
+      int accepted = 0;
+
       while (absl::Now() - start_time < timeout && absl::Now() - last_updated < absl::Seconds(5))
       {
+        trial++;
         const int current_prob = xor64() % 1000;
         if (current_prob > 0.8 * 1000)
         {
@@ -244,18 +324,23 @@ namespace iopddl
 
           std::vector<Operation> targets;
           std::vector<Operation> prevs;
+          targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+          prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
           targets.push_back(Operation{node, selection});
           prevs.push_back(Operation{node, old});
 
-          for (const auto &x : vertex.selectables[selection].connection_costs)
+          const auto &connection_costs = vertex.selectables[selection].connection_costs;
+          for (const auto &x : connection_costs)
           {
             int target_node = x.first;
             std::vector<int> cost_oks;
             bool no_fix = false;
             int priority = 100;
-            for (int j = 0; j < x.second.size(); ++j)
+            const auto &costs = x.second;
+            const size_t costs_size = costs.size();
+            for (int j = 0; j < costs_size; ++j)
             {
-              int go = x.second[j] / (TICK / 10);
+              int go = costs[j] / (TICK / 10);
               if (go < priority)
               {
                 priority = go;
@@ -280,9 +365,12 @@ namespace iopddl
               continue;
             }
             int target_selection = cost_oks[0];
+            const auto &target_vertex = problem.vertexs[target_node];
+            const auto &target_selectables = target_vertex.selectables;
+            const Usage min_usage = target_selectables[target_selection].usage;
             for (int j = 1; j < cost_oks.size(); ++j)
             {
-              if (problem.vertexs[target_node].selectables[cost_oks[j]].usage < problem.vertexs[target_node].selectables[target_selection].usage)
+              if (target_selectables[cost_oks[j]].usage < min_usage)
               {
                 target_selection = cost_oks[j];
               }
@@ -319,8 +407,10 @@ namespace iopddl
           {
             last_output = current;
             std::cout << "# Found solution with cost: " << cur_best_cost << std::endl;
+            std::cout << "# Trial/accepted: " << trial << "/" << accepted << std::endl;
           }
         }
+        accepted++;
       }
       TotalCost single_cost = 0;
       for (int i = 0; i < cur_best_solution->size(); i++)
