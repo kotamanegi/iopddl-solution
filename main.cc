@@ -23,11 +23,13 @@ limitations under the License.
 #include "iopddl.h"
 #include "solver.h"
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
   const std::string filename = argv[1];
   const absl::Duration timeout = absl::Seconds(atoi(argv[2]));
   const auto problem = iopddl::ReadProblem(filename);
-  if (!problem.ok()) exit(1);
+  if (!problem.ok())
+    exit(1);
   const auto solution = iopddl::Solver().Solve(*problem, timeout);
   const auto result = solution.value_or(iopddl::Solution{});
   std::cout << "[" << absl::StrJoin(result, ", ") << "]" << std::endl;

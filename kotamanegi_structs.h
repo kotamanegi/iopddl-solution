@@ -28,42 +28,46 @@ limitations under the License.
 #include "absl/status/statusor.h"
 
 // This is a simple selection/projection problem, right?
-namespace iopddl {
+namespace iopddl
+{
 
-using Cost = int64_t;
-using Usage = int64_t;
-using TimeIdx = int64_t;
-using VertexIdx = int64_t;
-using SelectionIdx = int64_t;
-using Interval = std::pair<TimeIdx, TimeIdx>;
-using Solution = std::vector<SelectionIdx>;
-using TotalUsage = absl::int128;
-using TotalCost = absl::int128;
+  using Cost = int64_t;
+  using Usage = int64_t;
+  using TimeIdx = int64_t;
+  using VertexIdx = int64_t;
+  using SelectionIdx = int64_t;
+  using Interval = std::pair<TimeIdx, TimeIdx>;
+  using Solution = std::vector<SelectionIdx>;
+  using TotalUsage = absl::int128;
+  using TotalCost = absl::int128;
 
-struct Selection {
-  Cost single_cost;
-  std::vector<std::pair<VertexIdx, std::vector<Cost>>> connection_costs; // cost = connection_costs[x][solution[connection_costs[x].first]];
-  Usage usage;
-  bool operator==(const Selection& other) const = default;
-};
+  struct Selection
+  {
+    Cost single_cost;
+    std::vector<std::pair<VertexIdx, std::vector<Cost>>> connection_costs; // cost = connection_costs[x][solution[connection_costs[x].first]];
+    Usage usage;
+    bool operator==(const Selection &other) const = default;
+  };
 
-struct Vertex {
-  Interval interval;  // Interpreted as half-open with an exclusive upper bound
-  std::vector<Selection> selectables;
-  bool operator==(const Vertex& other) const = default;
-};
+  struct Vertex
+  {
+    Interval interval; // Interpreted as half-open with an exclusive upper bound
+    std::vector<Selection> selectables;
+    bool operator==(const Vertex &other) const = default;
+  };
 
-struct ProblemInstance {
-  std::string name;
-  std::vector<Vertex> vertexs;
-  std::optional<Usage> usage_limit;
-  bool operator==(const ProblemInstance& other) const = default;
-};
+  struct ProblemInstance
+  {
+    std::string name;
+    std::vector<Vertex> vertexs;
+    std::optional<Usage> usage_limit;
+    bool operator==(const ProblemInstance &other) const = default;
+  };
 
-ProblemInstance convertToProblemInstance(const Problem& problem);
-ProblemInstance zipTimeInterval(const ProblemInstance &problem);
-absl::StatusOr<TotalCost> FastEvaluate(const ProblemInstance& problem,
-                                   const Solution& solution);
-}  // namespace iopddl
+  ProblemInstance convertToProblemInstance(const Problem &problem);
+  ProblemInstance zipTimeInterval(const ProblemInstance &problem);
+  absl::StatusOr<TotalCost> FastEvaluate(const ProblemInstance &problem,
+                                         const Solution &solution, const bool check_memory);
+} // namespace iopddl
 
-#endif  // IOPDDL_IOPDDL_KOTAMANEGI_STRUCTS_H_
+#endif // IOPDDL_IOPDDL_KOTAMANEGI_STRUCTS_H_

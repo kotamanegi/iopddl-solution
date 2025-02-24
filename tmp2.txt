@@ -1,0 +1,99 @@
+# Found solution with cost: 6546000000061623391442
+# Time from start: 5.05837
+# Trial/accepted: 8/0
+# Found solution with cost: 6537000000061306633505
+# Time from start: 6.08233
+# Trial/accepted: 7554/149
+# Found solution with cost: 6527000000080545066463
+# Time from start: 7.14652
+# Trial/accepted: 15544/298
+# Found solution with cost: 6509000000079222947012
+# Time from start: 8.15635
+# Trial/accepted: 23642/473
+# Found solution with cost: 6501000000074290942146
+# Time from start: 9.31597
+# Trial/accepted: 32000/649
+# Found solution with cost: 6170000000064659919610
+# Time from start: 10.3576
+# Trial/accepted: 40530/865
+# Found solution with cost: 6158000000064644673183
+# Time from start: 11.4615
+# Trial/accepted: 49328/1075
+# Found solution with cost: 6158000000063640104075
+# Time from start: 12.513
+# Trial/accepted: 57792/1295
+# Found solution with cost: 6157000000063517106748
+# Time from start: 13.5425
+# Trial/accepted: 66180/1500
+# Found solution with cost: 6155000000063421703969
+# Time from start: 14.5918
+# Trial/accepted: 74468/1707
+# Found solution with cost: 6151000000062852318494
+# Time from start: 15.7142
+# Trial/accepted: 83323/1943
+# Found solution with cost: 6149000000061899845722
+# Time from start: 16.7987
+# Trial/accepted: 92088/2148
+# Found solution with cost: 6147000000057434342403
+# Time from start: 18.1166
+# Trial/accepted: 102455/2399
+# Found solution with cost: 6146000000057430870725
+# Time from start: 19.3361
+# Trial/accepted: 110803/2618
+# Found solution with cost: 6129000000059215161618
+# Time from start: 20.3682
+# Trial/accepted: 118488/2811
+# Found solution with cost: 6129000000058400114507
+# Time from start: 21.3691
+# Trial/accepted: 125688/3006
+# Found solution with cost: 6129000000057276985934
+# Time from start: 22.4291
+# Trial/accepted: 134009/3228
+# Found solution with cost: 6129000000056708458287
+# Time from start: 23.4967
+# Trial/accepted: 142975/3470
+# Found solution with cost: 6128000000046005286103
+# Time from start: 24.5016
+# Trial/accepted: 151429/3692
+# Found solution with cost: 6128000000044543267707
+# Time from start: 25.7528
+# Trial/accepted: 162306/3993
+# Found solution with cost: 6127000000043600333813
+# Time from start: 26.7611
+# Trial/accepted: 170645/4215
+# Found solution with cost: 6044000000042473602554
+# Time from start: 27.9275
+# Trial/accepted: 179754/4441
+# Found solution with cost: 6044000000041576353131
+# Time from start: 28.9521
+# Trial/accepted: 187761/4649
+# Found solution with cost: 6043000000041553194794
+# Time from start: 30.1594
+# Trial/accepted: 197502/4900
+# Found solution with cost: 5640000000035859016627
+# Time from start: 31.2981
+# Trial/accepted: 206611/5139
+# Found solution with cost: 5640000000034883515197
+# Time from start: 32.4135
+# Trial/accepted: 215405/5388
+# Found solution with cost: 5639000000034501026968
+# Time from start: 33.4186
+# Trial/accepted: 223232/5587
+# Found solution with cost: 5627000000034533992531
+# Time from start: 35.0965
+# Trial/accepted: 236905/5932
+# Found solution with cost: 108000000034072192045
+# Time from start: 36.6042
+# Trial/accepted: 249211/5997
+# Found solution with cost: 106000000034039505080
+# Time from start: 38.7751
+# Trial/accepted: 255807/6004
+# Found solution with cost: 106000000033578133618
+# Time from start: 39.8185
+# Trial/accepted: 264039/6010
+# Found solution with cost: 104000000032817639917
+# Time from start: 40.8444
+# Trial/accepted: 272028/6022
+# Found solution with cost: 103000000032708565536
+# Time from start: 42.2631
+# Trial/accepted: 282772/6031

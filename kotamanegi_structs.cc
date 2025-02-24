@@ -141,7 +141,7 @@ namespace iopddl
     return instance;
   }
   absl::StatusOr<TotalCost> FastEvaluate(const ProblemInstance &problem,
-                                         const Solution &solution)
+                                         const Solution &solution, const bool check_memory)
   {
     if (solution.size() != problem.vertexs.size())
     {
@@ -163,7 +163,7 @@ namespace iopddl
     }
     cost /= 2;
 
-    if (problem.usage_limit)
+    if (problem.usage_limit && check_memory)
     {
       TimeIdx max_time = 0;
       for (const Vertex &vertex : problem.vertexs)
