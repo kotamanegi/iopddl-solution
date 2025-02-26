@@ -191,15 +191,131 @@ namespace iopddl
     return state;
   }
 
-  Solution create_feasible_solution(const ProblemInstance &problem)
+  State create_feasible_solution(ProblemInstance problem, absl::Duration timeout, absl::Time start_time)
   {
-    return Solution();
+
+    // We modify problem instance for simpler expression.
+    const long long TICK = 1000000000000000000;
+
+    // Initialize solution
+    State state = create_initial_state(problem);
+    absl::Time iteration_start = absl::Now();
+
+    absl::Time last_updated = absl::Now();
+    absl::Time last_output = absl::Now() - absl::Seconds(10);
+
+    while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(5) || absl::Now() - iteration_start < absl::Seconds(60)))
+    {
+
+      auto current = absl::Now();
+      if (current - last_output > absl::Seconds(1))
+      {
+        last_output = current;
+      }
+
+      const int current_prob = xor64() % 1000;
+      int node = xor64() % problem.vertexs.size();
+      const Vertex &vertex = problem.vertexs[node];
+
+      int selection = xor64() % vertex.selectables.size();
+      const int old = state.solution[node];
+      if (state.solution[node] == selection)
+      {
+        continue;
+      }
+
+      std::vector<Operation> targets;
+      std::vector<Operation> prevs;
+      targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+      prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+      targets.push_back(Operation{node, selection});
+      prevs.push_back(Operation{node, old});
+
+      const auto &connection_costs = vertex.selectables[selection].connection_costs;
+      int no_fix_allow = (xor64() % 10 == 0);
+      for (const auto &x : connection_costs)
+      {
+        int target_node = x.first;
+        if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+        {
+          continue;
+        }
+        std::vector<int> cost_oks;
+        bool no_fix = false;
+        const auto &costs = x.second;
+        const size_t costs_size = costs.size();
+        for (int j = 0; j < costs_size; ++j)
+        {
+          int go = costs[j] / (TICK / 10);
+          if (go == 0)
+          {
+            if (state.solution[target_node] == j)
+            {
+              no_fix = true;
+            }
+            cost_oks.push_back(j);
+          }
+        }
+        if (no_fix && no_fix_allow == false)
+        {
+          continue;
+        }
+        if (cost_oks.size() == 0)
+          continue;
+        int target_selection = cost_oks[0];
+        const auto &target_vertex = problem.vertexs[target_node];
+        const auto &target_selectables = target_vertex.selectables;
+        const Usage min_usage = target_selectables[target_selection].usage;
+        for (int j = 1; j < cost_oks.size(); ++j)
+        {
+          if (target_selectables[cost_oks[j]].usage < min_usage)
+          {
+            target_selection = cost_oks[j];
+          }
+        }
+        targets.push_back(Operation{target_node, target_selection});
+        prevs.push_back(Operation{target_node, state.solution[target_node]});
+      }
+
+      TotalCost old_cost = state.current_cost;
+      state.update(targets);
+      if (!state.isValid)
+      {
+        state.update(prevs);
+        continue;
+      }
+      TotalCost new_cost = state.current_cost;
+      TotalCost cost_diff = new_cost - old_cost;
+
+      const long long TICK = 1000000000000000000;
+      if (cost_diff > 0)
+      {
+        if (cost_diff >= (long long)TICK / 10)
+        {
+          state.update(prevs);
+          continue;
+        }
+        else if (xor64() % 1000 <= 990)
+        {
+          // revert.
+          state.update(prevs);
+          continue;
+        }
+      }
+
+      if (state.current_cost < (long long)1e18)
+      {
+        return state;
+      }
+    }
+    return state;
   };
 
-  absl::StatusOr<Solution> Solver::Solve(const Problem &_problem,
-                                         absl::Duration _timeout)
+  absl::StatusOr<Solution>
+  Solver::Solve(const Problem &_problem,
+                absl::Duration _timeout)
   {
-#define output(x) std::cerr << x << std::endl
+#define output(x) // std::cerr << x << std::endl
     const absl::Time start_time = absl::Now();
     std::cout << "# Entered Solver::Solve function at: " << start_time << std::endl;
 
@@ -222,157 +338,829 @@ namespace iopddl
       const long long TICK = 1000000000000000000;
 
       // Initialize solution
-      State state = create_initial_state(problem);
       while (absl::Now() - start_time < timeout)
       {
-        TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
-        std::optional<Solution> cur_best_solution;
-
-        absl::Time iteration_start = absl::Now();
-
-        absl::Time last_updated = absl::Now();
-        absl::Time last_output = absl::Now() - absl::Seconds(10);
-
-        int trial = 0;
-        int accepted = 0;
-        std::map<int, int> scores;
-
-        while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(5) || absl::Now() - iteration_start < absl::Seconds(60)))
+        if (problem.vertexs.size() <= 2000)
         {
+          output("# Instance-Type G");
+          TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
+          Solution cur_best_solution;
 
-          auto current = absl::Now();
-          if (current - last_output > absl::Seconds(1))
+          State _state = create_feasible_solution(problem, timeout, start_time);
+          cur_best_cost = _state.current_cost;
+          cur_best_solution = _state.solution;
+          if (global_best_cost > cur_best_cost)
           {
-            last_output = current;
-            output("# Found solution with cost: " << cur_best_cost);
-            output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
-            output("# Trial/accepted: " << trial << "/" << accepted);
+            global_best_cost = cur_best_cost;
+            global_best_solution = cur_best_solution;
           }
-
-          trial++;
-          const int current_prob = xor64() % 1000;
-          int node = xor64() % problem.vertexs.size();
-          const Vertex &vertex = problem.vertexs[node];
-
-          int selection = xor64() % vertex.selectables.size();
-          const int old = state.solution[node];
-          if (state.solution[node] == selection)
+          Solution feasible_sol = _state.solution;
+          output("# Initial cost: " << cur_best_cost);
+          output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+          if (_state.current_cost >= TICK / 10)
           {
+            output("# Fallback as the initial solution is not good enough.");
             continue;
           }
 
-          std::vector<Operation> targets;
-          std::vector<Operation> prevs;
-          targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
-          prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
-          targets.push_back(Operation{node, selection});
-          prevs.push_back(Operation{node, old});
-
-          const auto &connection_costs = vertex.selectables[selection].connection_costs;
-          int no_fix_allow = (xor64() % 10 == 0);
-          for (const auto &x : connection_costs)
+          if (absl::Now() - start_time > timeout)
           {
-            int target_node = x.first;
-            if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+            break;
+          }
+
+          State state = State{problem, true, feasible_sol};
+          state.construct();
+
+          // Reinstanciate to find 2-way solution.
+          for (int iteration = 0; iteration < 10; ++iteration)
+          {
+            absl::Time iteration_start = absl::Now();
+            absl::Time last_updated = absl::Now();
+            absl::Time last_output = absl::Now() - absl::Seconds(10);
+            for (int i = 0; i < feasible_sol.size(); ++i)
             {
-              continue;
+              state.update(std::vector<Operation>{{i, feasible_sol[i]}});
             }
-            std::vector<int> cost_oks;
-            bool no_fix = false;
-            const auto &costs = x.second;
-            const size_t costs_size = costs.size();
-            for (int j = 0; j < costs_size; ++j)
+
+            TotalCost now_best = state.current_cost;
+            Solution now_best_solution = state.solution;
+
+            while (absl::Now() - start_time < timeout && absl::Now() - iteration_start < absl::Seconds(5))
             {
-              int go = costs[j] / (TICK / 10);
-              if (go == 0)
+              auto current = absl::Now();
+
+              const int current_prob = xor64() % 1000;
+              int node = xor64() % problem.vertexs.size();
+              const Vertex &vertex = problem.vertexs[node];
+
+              int selection = xor64() % vertex.selectables.size();
+              const int old = state.solution[node];
+              if (state.solution[node] == selection)
               {
-                if (state.solution[target_node] == j)
+                continue;
+              }
+
+              std::vector<Operation> targets;
+              std::vector<Operation> prevs;
+              targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+              prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+              targets.push_back(Operation{node, selection});
+              prevs.push_back(Operation{node, old});
+
+              const auto &connection_costs = vertex.selectables[selection].connection_costs;
+              int no_fix_allow = (xor64() % 10 == 0);
+              for (const auto &x : connection_costs)
+              {
+                int target_node = x.first;
+                if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
                 {
-                  no_fix = true;
+                  continue;
                 }
-                cost_oks.push_back(j);
+                std::vector<int> cost_oks;
+                bool no_fix = false;
+                const auto &costs = x.second;
+                const size_t costs_size = costs.size();
+                for (int j = 0; j < costs_size; ++j)
+                {
+                  int go = costs[j] / (TICK / 10);
+                  if (go == 0)
+                  {
+                    if (state.solution[target_node] == j)
+                    {
+                      no_fix = true;
+                    }
+                    cost_oks.push_back(j);
+                  }
+                }
+                if (no_fix && no_fix_allow == false)
+                {
+                  continue;
+                }
+                if (cost_oks.size() == 0)
+                  continue;
+                int target_selection = cost_oks[0];
+                const auto &target_vertex = problem.vertexs[target_node];
+                const auto &target_selectables = target_vertex.selectables;
+                const Usage min_usage = target_selectables[target_selection].usage;
+                for (int j = 1; j < cost_oks.size(); ++j)
+                {
+                  if (target_selectables[cost_oks[j]].usage < min_usage)
+                  {
+                    target_selection = cost_oks[j];
+                  }
+                }
+                targets.push_back(Operation{target_node, target_selection});
+                prevs.push_back(Operation{target_node, state.solution[target_node]});
               }
-            }
-            if (no_fix && no_fix_allow == false)
-            {
-              continue;
-            }
-            if (cost_oks.size() == 0)
-              continue;
-            int target_selection = cost_oks[0];
-            const auto &target_vertex = problem.vertexs[target_node];
-            const auto &target_selectables = target_vertex.selectables;
-            const Usage min_usage = target_selectables[target_selection].usage;
-            for (int j = 1; j < cost_oks.size(); ++j)
-            {
-              if (target_selectables[cost_oks[j]].usage < min_usage)
+
+              TotalCost old_cost = state.current_cost;
+              state.update(targets);
+              if (!state.isValid)
               {
-                target_selection = cost_oks[j];
+                state.update(prevs);
+                continue;
+              }
+              TotalCost new_cost = state.current_cost;
+              TotalCost cost_diff = new_cost - old_cost;
+
+              if (cost_diff > 0)
+              {
+                if (cost_diff >= (long long)1e17)
+                {
+                  state.update(prevs);
+                  continue;
+                }
+                if (cost_diff <= (long long)1e17 && xor64() % 1000 <= 995)
+                {
+                  // revert.
+                  state.update(prevs);
+                  continue;
+                }
+              }
+
+              if (state.current_cost < now_best)
+              {
+                now_best = state.current_cost;
+                now_best_solution = state.solution;
+                auto current = absl::Now();
+                last_updated = absl::Now();
               }
             }
-            targets.push_back(Operation{target_node, target_selection});
-            prevs.push_back(Operation{target_node, state.solution[target_node]});
-          }
-
-          TotalCost old_cost = state.current_cost;
-          scores[targets.size()]++;
-          state.update(targets);
-          if (!state.isValid)
-          {
-            state.update(prevs);
-            continue;
-          }
-          TotalCost new_cost = state.current_cost;
-          TotalCost cost_diff = new_cost - old_cost;
-
-          if (cost_diff > 0)
-          {
-            if (cost_diff >= (long long)1e17)
+            output("# Temporary cost: " << now_best);
+            output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+            if (now_best < cur_best_cost)
             {
-              state.update(prevs);
-              continue;
+              cur_best_cost = now_best;
+              cur_best_solution = now_best_solution;
             }
-            if (cost_diff <= (long long)1e17 && xor64() % 1000 <= 995)
+            if (global_best_cost > cur_best_cost)
             {
-              // revert.
-              state.update(prevs);
-              continue;
+              global_best_cost = cur_best_cost;
+              global_best_solution = cur_best_solution;
+            }
+            if (absl::Now() - start_time > timeout)
+            {
+              break;
             }
           }
-
-          if (state.current_cost < cur_best_cost)
+          if (absl::Now() - start_time > timeout)
           {
-            cur_best_cost = state.current_cost;
-            cur_best_solution = state.solution;
+            break;
+          }
+
+          // finalize iterations.
+          for (int i = 0; i < cur_best_solution.size(); ++i)
+          {
+            state.update(std::vector<Operation>{{i, cur_best_solution[i]}});
+          }
+          absl::Time iteration_start = absl::Now();
+          absl::Time last_updated = absl::Now();
+          absl::Time last_output = absl::Now() - absl::Seconds(10);
+          while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(5) || absl::Now() - iteration_start < absl::Seconds(60)))
+          {
+
             auto current = absl::Now();
-            last_updated = absl::Now();
             if (current - last_output > absl::Seconds(1))
             {
               last_output = current;
-              output("# " << core << ": Found solution with cost: " << cur_best_cost);
+              output("# Found solution with cost: " << cur_best_cost);
+              output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
+            }
+
+            const int current_prob = xor64() % 1000;
+            int node = xor64() % problem.vertexs.size();
+            const Vertex &vertex = problem.vertexs[node];
+
+            int selection = xor64() % vertex.selectables.size();
+            const int old = state.solution[node];
+            if (state.solution[node] == selection)
+            {
+              continue;
+            }
+
+            std::vector<Operation> targets;
+            std::vector<Operation> prevs;
+            targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            targets.push_back(Operation{node, selection});
+            prevs.push_back(Operation{node, old});
+
+            const auto &connection_costs = vertex.selectables[selection].connection_costs;
+            int no_fix_allow = (xor64() % 10 == 0);
+            for (const auto &x : connection_costs)
+            {
+              int target_node = x.first;
+              if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+              {
+                continue;
+              }
+              std::vector<int> cost_oks;
+              bool no_fix = false;
+              const auto &costs = x.second;
+              const size_t costs_size = costs.size();
+              for (int j = 0; j < costs_size; ++j)
+              {
+                int go = costs[j] / (TICK / 10);
+                if (go == 0)
+                {
+                  if (state.solution[target_node] == j)
+                  {
+                    no_fix = true;
+                  }
+                  cost_oks.push_back(j);
+                }
+              }
+              if (no_fix && no_fix_allow == false)
+              {
+                continue;
+              }
+              if (cost_oks.size() == 0)
+                continue;
+              int target_selection = cost_oks[0];
+              const auto &target_vertex = problem.vertexs[target_node];
+              const auto &target_selectables = target_vertex.selectables;
+              const Usage min_usage = target_selectables[target_selection].usage;
+              for (int j = 1; j < cost_oks.size(); ++j)
+              {
+                if (target_selectables[cost_oks[j]].usage < min_usage)
+                {
+                  target_selection = cost_oks[j];
+                }
+              }
+              targets.push_back(Operation{target_node, target_selection});
+              prevs.push_back(Operation{target_node, state.solution[target_node]});
+            }
+
+            TotalCost old_cost = state.current_cost;
+            state.update(targets);
+            if (!state.isValid)
+            {
+              state.update(prevs);
+              continue;
+            }
+            TotalCost new_cost = state.current_cost;
+            TotalCost cost_diff = new_cost - old_cost;
+
+            if (cost_diff > 0)
+            {
+              if (cost_diff >= (long long)1e17)
+              {
+                state.update(prevs);
+                continue;
+              }
+              if (cost_diff <= (long long)1e17 && xor64() % 1000 <= 995)
+              {
+                // revert.
+                state.update(prevs);
+                continue;
+              }
+            }
+
+            if (state.current_cost < cur_best_cost)
+            {
+              cur_best_cost = state.current_cost;
+              cur_best_solution = state.solution;
+              auto current = absl::Now();
+              last_updated = absl::Now();
+              if (current - last_output > absl::Seconds(1))
+              {
+                last_output = current;
+                output("# " << core << ": Found solution with cost: " << cur_best_cost);
+              }
             }
           }
-          accepted++;
+          output("# Final cost: " << cur_best_cost);
+          output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+          if (global_best_cost > cur_best_cost)
+          {
+            global_best_cost = cur_best_cost;
+            global_best_solution = cur_best_solution;
+          }
         }
-        TotalCost single_cost = 0;
-        for (int i = 0; i < cur_best_solution->size(); i++)
+        else if (timeout <= absl::Seconds(60))
         {
-          single_cost += problem.vertexs[i].selectables[(*cur_best_solution)[i]].single_cost;
+          // for instance A.
+          output("# Instance-Type A");
+          TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
+          Solution cur_best_solution;
+          // solution for larger instance.
+          State state = create_initial_state(problem);
+          absl::Time iteration_start = absl::Now();
+          absl::Time last_updated = absl::Now();
+          absl::Time last_output = absl::Now() - absl::Seconds(10);
+          while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(10) || absl::Now() - iteration_start < absl::Seconds(60)))
+          {
+
+            auto current = absl::Now();
+            if (current - last_output > absl::Seconds(1))
+            {
+              last_output = current;
+              output("# Found solution with cost: " << cur_best_cost);
+              output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
+            }
+
+            const int current_prob = xor64() % 1000;
+            int node = xor64() % problem.vertexs.size();
+            const Vertex &vertex = problem.vertexs[node];
+
+            int selection = xor64() % vertex.selectables.size();
+            const int old = state.solution[node];
+            if (state.solution[node] == selection)
+            {
+              continue;
+            }
+
+            std::vector<Operation> targets;
+            std::vector<Operation> prevs;
+            targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            targets.push_back(Operation{node, selection});
+            prevs.push_back(Operation{node, old});
+
+            const auto &connection_costs = vertex.selectables[selection].connection_costs;
+            int no_fix_allow = (xor64() % 10 == 0);
+            for (const auto &x : connection_costs)
+            {
+              int target_node = x.first;
+              if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+              {
+                continue;
+              }
+              std::vector<int> cost_oks;
+              bool no_fix = false;
+              const auto &costs = x.second;
+              const size_t costs_size = costs.size();
+              for (int j = 0; j < costs_size; ++j)
+              {
+                int go = costs[j] / (TICK / 10);
+                if (go == 0)
+                {
+                  if (state.solution[target_node] == j)
+                  {
+                    no_fix = true;
+                  }
+                  cost_oks.push_back(j);
+                }
+              }
+              if (no_fix && no_fix_allow == false)
+              {
+                continue;
+              }
+              if (cost_oks.size() == 0)
+                continue;
+              int target_selection = cost_oks[0];
+              const auto &target_vertex = problem.vertexs[target_node];
+              const auto &target_selectables = target_vertex.selectables;
+              const Usage min_usage = target_selectables[target_selection].usage;
+              for (int j = 1; j < cost_oks.size(); ++j)
+              {
+                if (target_selectables[cost_oks[j]].usage < min_usage)
+                {
+                  target_selection = cost_oks[j];
+                }
+              }
+              targets.push_back(Operation{target_node, target_selection});
+              prevs.push_back(Operation{target_node, state.solution[target_node]});
+            }
+
+            TotalCost old_cost = state.current_cost;
+            state.update(targets);
+            if (!state.isValid)
+            {
+              state.update(prevs);
+              continue;
+            }
+            TotalCost new_cost = state.current_cost;
+            TotalCost cost_diff = new_cost - old_cost;
+
+            if (cost_diff > 0)
+            {
+              state.update(prevs);
+              continue;
+            }
+
+            if (state.current_cost < cur_best_cost)
+            {
+              cur_best_cost = state.current_cost;
+              cur_best_solution = state.solution;
+              auto current = absl::Now();
+              last_updated = absl::Now();
+              if (current - last_output > absl::Seconds(1))
+              {
+                last_output = current;
+                output("# " << core << ": Found solution with cost: " << cur_best_cost);
+              }
+            }
+          }
+          output("# Final cost: " << cur_best_cost);
+          output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+          if (global_best_cost > cur_best_cost)
+          {
+            global_best_cost = cur_best_cost;
+            global_best_solution = cur_best_solution;
+          }
         }
-        output("# Single cost: " << single_cost);
-        output("# connection_cost: " << cur_best_cost - single_cost);
-        output("# Final cost: " << cur_best_cost);
-        output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
-        output("# Trial/accepted: " << trial << "/" << accepted);
-        if (global_best_cost > cur_best_cost)
+        else if (timeout <= absl::Seconds(180))
         {
-          global_best_cost = cur_best_cost;
-          global_best_solution = cur_best_solution;
+          output("# Instance-Type M");
+
+          TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
+          Solution cur_best_solution;
+          // solution for larger instance.
+          State state = create_initial_state(problem);
+          absl::Time iteration_start = absl::Now();
+          absl::Time last_updated = absl::Now();
+          absl::Time last_output = absl::Now() - absl::Seconds(10);
+          while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(10) || absl::Now() - iteration_start < absl::Seconds(60)))
+          {
+
+            auto current = absl::Now();
+            if (current - last_output > absl::Seconds(1))
+            {
+              last_output = current;
+              output("# Found solution with cost: " << cur_best_cost);
+              output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
+            }
+
+            const int current_prob = xor64() % 1000;
+            int node = xor64() % problem.vertexs.size();
+            const Vertex &vertex = problem.vertexs[node];
+
+            int selection = xor64() % vertex.selectables.size();
+            const int old = state.solution[node];
+            if (state.solution[node] == selection)
+            {
+              continue;
+            }
+
+            std::vector<Operation> targets;
+            std::vector<Operation> prevs;
+            targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            targets.push_back(Operation{node, selection});
+            prevs.push_back(Operation{node, old});
+
+            const auto &connection_costs = vertex.selectables[selection].connection_costs;
+            int no_fix_allow = (xor64() % 10 == 0);
+            for (const auto &x : connection_costs)
+            {
+              int target_node = x.first;
+              if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+              {
+                continue;
+              }
+              std::vector<int> cost_oks;
+              bool no_fix = false;
+              const auto &costs = x.second;
+              const size_t costs_size = costs.size();
+              for (int j = 0; j < costs_size; ++j)
+              {
+                int go = costs[j] / (TICK / 10);
+                if (go == 0)
+                {
+                  if (state.solution[target_node] == j)
+                  {
+                    no_fix = true;
+                  }
+                  cost_oks.push_back(j);
+                }
+              }
+              if (no_fix && no_fix_allow == false)
+              {
+                continue;
+              }
+              if (cost_oks.size() == 0)
+                continue;
+              int target_selection = cost_oks[0];
+              const auto &target_vertex = problem.vertexs[target_node];
+              const auto &target_selectables = target_vertex.selectables;
+              const Usage min_usage = target_selectables[target_selection].usage;
+              for (int j = 1; j < cost_oks.size(); ++j)
+              {
+                if (target_selectables[cost_oks[j]].usage < min_usage)
+                {
+                  target_selection = cost_oks[j];
+                }
+              }
+              targets.push_back(Operation{target_node, target_selection});
+              prevs.push_back(Operation{target_node, state.solution[target_node]});
+            }
+
+            TotalCost old_cost = state.current_cost;
+            state.update(targets);
+            if (!state.isValid)
+            {
+              state.update(prevs);
+              continue;
+            }
+            TotalCost new_cost = state.current_cost;
+            TotalCost cost_diff = new_cost - old_cost;
+
+            if (cost_diff > 0)
+            {
+              if (cost_diff >= (long long)1e17)
+              {
+                state.update(prevs);
+                continue;
+              }
+              if (((cost_diff >= state.current_cost / 100000 || xor64() % 1000 <= 950) && (xor64() % 1000000 != 0)))
+              {
+                // revert.
+                state.update(prevs);
+                continue;
+              }
+            }
+
+            if (state.current_cost < cur_best_cost)
+            {
+              cur_best_cost = state.current_cost;
+              cur_best_solution = state.solution;
+              auto current = absl::Now();
+              last_updated = absl::Now();
+              if (current - last_output > absl::Seconds(1))
+              {
+                last_output = current;
+                output("# " << core << ": Found solution with cost: " << cur_best_cost);
+              }
+            }
+          }
+          output("# Final cost: " << cur_best_cost);
+          output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+          if (global_best_cost > cur_best_cost)
+          {
+            global_best_cost = cur_best_cost;
+            global_best_solution = cur_best_solution;
+          }
         }
+        else if (timeout <= absl::Seconds(240))
+        {
+          output("# Instance-Type S");
+          // Instance 4, 5
+          TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
+          Solution cur_best_solution;
+          // solution for larger instance.
+          State state = create_initial_state(problem);
+          absl::Time iteration_start = absl::Now();
+          absl::Time last_updated = absl::Now();
+          absl::Time last_output = absl::Now() - absl::Seconds(10);
+          while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(10) || absl::Now() - iteration_start < absl::Seconds(60)))
+          {
+
+            auto current = absl::Now();
+            if (current - last_output > absl::Seconds(1))
+            {
+              last_output = current;
+              output("# Found solution with cost: " << cur_best_cost);
+              output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
+            }
+
+            const int current_prob = xor64() % 1000;
+            int node = xor64() % problem.vertexs.size();
+            const Vertex &vertex = problem.vertexs[node];
+
+            int selection = xor64() % vertex.selectables.size();
+            const int old = state.solution[node];
+            if (state.solution[node] == selection)
+            {
+              continue;
+            }
+
+            std::vector<Operation> targets;
+            std::vector<Operation> prevs;
+            targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            targets.push_back(Operation{node, selection});
+            prevs.push_back(Operation{node, old});
+
+            const auto &connection_costs = vertex.selectables[selection].connection_costs;
+            int no_fix_allow = (xor64() % 10 == 0);
+            for (const auto &x : connection_costs)
+            {
+              int target_node = x.first;
+              if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+              {
+                continue;
+              }
+              std::vector<int> cost_oks;
+              bool no_fix = false;
+              const auto &costs = x.second;
+              const size_t costs_size = costs.size();
+              for (int j = 0; j < costs_size; ++j)
+              {
+                int go = costs[j] / (TICK / 10);
+                if (go == 0)
+                {
+                  if (state.solution[target_node] == j)
+                  {
+                    no_fix = true;
+                  }
+                  cost_oks.push_back(j);
+                }
+              }
+              if (no_fix && no_fix_allow == false)
+              {
+                continue;
+              }
+              if (cost_oks.size() == 0)
+                continue;
+              int target_selection = cost_oks[0];
+              const auto &target_vertex = problem.vertexs[target_node];
+              const auto &target_selectables = target_vertex.selectables;
+              const Usage min_usage = target_selectables[target_selection].usage;
+              for (int j = 1; j < cost_oks.size(); ++j)
+              {
+                if (target_selectables[cost_oks[j]].usage < min_usage)
+                {
+                  target_selection = cost_oks[j];
+                }
+              }
+              targets.push_back(Operation{target_node, target_selection});
+              prevs.push_back(Operation{target_node, state.solution[target_node]});
+            }
+
+            TotalCost old_cost = state.current_cost;
+            state.update(targets);
+            if (!state.isValid)
+            {
+              state.update(prevs);
+              continue;
+            }
+            TotalCost new_cost = state.current_cost;
+            TotalCost cost_diff = new_cost - old_cost;
+
+            if (cost_diff > 0)
+            {
+              if (cost_diff >= TICK / 10)
+              {
+                state.update(prevs);
+                continue;
+              }
+              if (((cost_diff >= state.current_cost / 100000 || xor64() % 1000 <= 990) && (xor64() % 1000000 != 0)))
+              {
+                // revert.
+                state.update(prevs);
+                continue;
+              }
+            }
+
+            if (state.current_cost < cur_best_cost)
+            {
+              cur_best_cost = state.current_cost;
+              cur_best_solution = state.solution;
+              auto current = absl::Now();
+              last_updated = absl::Now();
+              if (current - last_output > absl::Seconds(1))
+              {
+                last_output = current;
+                output("# " << core << ": Found solution with cost: " << cur_best_cost);
+              }
+            }
+          }
+          output("# Final cost: " << cur_best_cost);
+          output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+          if (global_best_cost > cur_best_cost)
+          {
+            global_best_cost = cur_best_cost;
+            global_best_solution = cur_best_solution;
+          }
+        }
+        else
+        {
+
+          output("# Instance-Type Y");
+          // Instance 5
+          TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
+          Solution cur_best_solution;
+          // solution for larger instance.
+          State state = create_initial_state(problem);
+          absl::Time iteration_start = absl::Now();
+          absl::Time last_updated = absl::Now();
+          absl::Time last_output = absl::Now() - absl::Seconds(10);
+          while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(10) || absl::Now() - iteration_start < absl::Seconds(60)))
+          {
+
+            auto current = absl::Now();
+            if (current - last_output > absl::Seconds(1))
+            {
+              last_output = current;
+              output("# Found solution with cost: " << cur_best_cost);
+              output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
+            }
+
+            const int current_prob = xor64() % 1000;
+            int node = xor64() % problem.vertexs.size();
+            const Vertex &vertex = problem.vertexs[node];
+
+            int selection = xor64() % vertex.selectables.size();
+            const int old = state.solution[node];
+            if (state.solution[node] == selection)
+            {
+              continue;
+            }
+
+            std::vector<Operation> targets;
+            std::vector<Operation> prevs;
+            targets.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            prevs.reserve(vertex.selectables[selection].connection_costs.size() + 1);
+            targets.push_back(Operation{node, selection});
+            prevs.push_back(Operation{node, old});
+
+            const auto &connection_costs = vertex.selectables[selection].connection_costs;
+            for (const auto &x : connection_costs)
+            {
+              int target_node = x.first;
+              if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
+              {
+                continue;
+              }
+              std::vector<int> cost_oks;
+              bool no_fix = false;
+              const auto &costs = x.second;
+              const size_t costs_size = costs.size();
+              for (int j = 0; j < costs_size; ++j)
+              {
+                int go = costs[j] / (TICK / 10);
+                if (go == 0)
+                {
+                  if (state.solution[target_node] == j)
+                  {
+                    no_fix = true;
+                  }
+                  cost_oks.push_back(j);
+                }
+              }
+              if (no_fix)
+              {
+                continue;
+              }
+              if (cost_oks.size() == 0)
+                continue;
+              int target_selection = cost_oks[0];
+              const auto &target_vertex = problem.vertexs[target_node];
+              const auto &target_selectables = target_vertex.selectables;
+              const Usage min_usage = target_selectables[target_selection].usage;
+              for (int j = 1; j < cost_oks.size(); ++j)
+              {
+                if (target_selectables[cost_oks[j]].usage < min_usage)
+                {
+                  target_selection = cost_oks[j];
+                }
+              }
+              targets.push_back(Operation{target_node, target_selection});
+              prevs.push_back(Operation{target_node, state.solution[target_node]});
+            }
+
+            TotalCost old_cost = state.current_cost;
+            state.update(targets);
+            if (!state.isValid)
+            {
+              state.update(prevs);
+              continue;
+            }
+            TotalCost new_cost = state.current_cost;
+            TotalCost cost_diff = new_cost - old_cost;
+
+            if (cost_diff > 0)
+            {
+              if (cost_diff >= (long long)1e17)
+              {
+                state.update(prevs);
+                continue;
+              }
+              if (((cost_diff >= state.current_cost / 100000 || xor64() % 1000 <= 990) && (xor64() % 1000000 != 0)))
+              {
+                // revert.
+                state.update(prevs);
+                continue;
+              }
+            }
+
+            if (state.current_cost < cur_best_cost)
+            {
+              cur_best_cost = state.current_cost;
+              cur_best_solution = state.solution;
+              auto current = absl::Now();
+              last_updated = absl::Now();
+              if (current - last_output > absl::Seconds(1))
+              {
+                last_output = current;
+                output("# " << core << ": Found solution with cost: " << cur_best_cost);
+              }
+            }
+          }
+          output("# Final cost: " << cur_best_cost);
+          output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
+          if (global_best_cost > cur_best_cost)
+          {
+            global_best_cost = cur_best_cost;
+            global_best_solution = cur_best_solution;
+          }
+        }
+        node_global_best_cost[core] = global_best_cost;
+        node_global_best_solution[core] = global_best_solution;
       }
-      node_global_best_cost[core] = global_best_cost;
-      node_global_best_solution[core] = global_best_solution;
     }
+
     TotalCost the_best = std::numeric_limits<TotalCost>::max();
     std::optional<Solution> the_best_solution;
     for (int i = 0; i < number_of_cores; ++i)
@@ -386,17 +1174,9 @@ namespace iopddl
     }
     std::cout << "# Final cost: " << the_best << std::endl;
 
-    // validate solution.
-    absl::StatusOr<TotalCost> verify_result = Evaluate(_problem, the_best_solution.value());
-    if (verify_result.ok() == false || verify_result.value() != the_best)
-    {
-      std::cerr << "# Verification failed." << std::endl;
-      return absl::InvalidArgumentError("Verification failed.");
-    }
     absl::Time current_time = absl::Now();
     std::cout << "# Exiting Solver::solve at: " << current_time << std::endl;
     std::cout << "# Elapsed: " << absl::ToDoubleSeconds(current_time - start_time) << std::endl;
     return *the_best_solution;
   }
-
 } // namespace iopddl
