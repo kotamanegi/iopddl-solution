@@ -23,15 +23,17 @@ limitations under the License.
 #include "absl/time/time.h"
 #include "iopddl.h"
 
-namespace iopddl {
+namespace iopddl
+{
 
-class Solver {
- public:
-  absl::StatusOr<Solution> Solve(
-      const Problem& problem,
-      absl::Duration timeout = absl::InfiniteDuration());
-};
+    class Solver
+    {
+    public:
+        absl::StatusOr<Solution> Solve(
+            const Problem &problem,
+            absl::Duration timeout = absl::InfiniteDuration());
+    };
 
-}  // namespace iopddl
+} // namespace iopddl
 
-#endif  // IOPDDL_SOLVER_H
+#endif // IOPDDL_SOLVER_H

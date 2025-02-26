@@ -1,21 +1,5 @@
-# Time from start: 49.2513
-# Trial/accepted: 212411/479
-# Time from start: 60.0057
-# Trial/accepted: 260742/1483
-# Time from start: 60.0061
-# Trial/accepted: 37341/822
-# Time from start: 60.0063
-# Trial/accepted: 266377# Time from start: 60.0064
-# Trial/accepted: 260570/1205
-/4321
-# Time from start: 60.0068
-# Trial/accepted: 259694/1188
-# Time from start: 60.0362
-# Trial/accepted: 264615/2242
-# core: 0 final_cost: 258000000058033047873
-# core: 1 final_cost: 61000000024852445646
-# core: 2 final_cost: 347000000028945704703
-# core: 3 final_cost: 489000000034782930902
-# core: 4 final_cost: 447000000027155617630
-# core: 5 final_cost: 454000000037665184912
-# Final cost: 61000000024852445646
+# Found solution with cost: 19635858118
+# Time from start: 30.6094
+# Trial/accepted: 827245/14385
+
+# Convertion to problem instance finished: 3.53811

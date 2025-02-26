@@ -1,0 +1,20 @@
+# core: 0 final_cost: 1782049897056
+# core: 1 final_cost: 1747589793518
+# core: 2 final_cost: 1672042361152
+# core: 3 final_cost: 1831735139701
+# core: 4 final_cost: 1960993494842
+# core: 5 final_cost: 2045014928289
+# Final cost: 1672042361152
+# Exiting Solver::solve at: 2025-02-24T21:06:00.97194328+09:00
+# Elapsed: 299.016
+
+
+# core: 0 final_cost: 1921715623488
+# core: 1 final_cost: 2082387926701
+# core: 2 final_cost: 2075701504577
+# core: 3 final_cost: 1807675310368
+# core: 4 final_cost: 1928180856277
+# core: 5 final_cost: 1834660358089
+# Final cost: 1807675310368
+# Exiting Solver::solve at: 2025-02-24T22:08:00.804226113+09:00
+# Elapsed: 299.015

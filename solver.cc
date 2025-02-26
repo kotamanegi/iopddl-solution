@@ -39,7 +39,7 @@ namespace iopddl
   // xorshift is waaaaaay fast if we do not need good-quality randomness but still want not-bad quality.
   uint64_t xor64()
   {
-    static uint64_t state = 7236178123;
+    static uint64_t state = time(NULL);
     uint64_t x = state;
     x ^= x << 13;
     x ^= x >> 7;
@@ -77,92 +77,9 @@ namespace iopddl
           solution(solution)
     {
     }
-    void dfs(int node, std::vector<int> &visited)
-    {
-      visited[node] = 1;
-      // determine the best solution in the world.
-      int target_itr = 0;
-      Usage target_memory = std::numeric_limits<Usage>::max();
-      const Cost TICK = 100000000000000000;
-      for (int i = 0; i < problem.vertexs[node].selectables.size(); i++)
-      {
-        // check if valid.
-        bool is_valid = 1;
-        for (auto &x : problem.vertexs[node].selectables)
-        {
-          for (auto y : x.connection_costs)
-          {
-            if (visited[y.first] == 1)
-            {
-              if (y.second[solution[y.first]] >= TICK)
-              {
-                is_valid = 0;
-              }
-            }
-          }
-        }
-        if (!is_valid)
-        {
-          continue;
-        }
-        Usage memory = problem.vertexs[node].selectables[i].usage;
-        if (memory < target_memory)
-        {
-          target_memory = memory;
-          target_itr = i;
-        }
-      }
-      if (target_memory == std::numeric_limits<Usage>::max())
-      {
-        for (int i = 0; i < problem.vertexs[node].selectables.size(); i++)
-        {
-          Usage memory = problem.vertexs[node].selectables[i].usage;
-          if (memory < target_memory)
-          {
-            target_memory = memory;
-            target_itr = i;
-          }
-        }
-      }
-      update({Operation{node, target_itr}});
-      for (const auto &x : problem.vertexs[node].selectables[solution[node]].connection_costs)
-      {
-        if (visited[x.first] == 0)
-        {
-          dfs(x.first, visited);
-        }
-      }
-    }
-    void initialize()
-    {
-      // not used anymore.
-      return;
-      std::vector<int> visited(problem.vertexs.size(), 0);
-      int counter = 0;
-      for (int i = 0; i < problem.vertexs.size(); i++)
-      {
-        if (visited[i] == 0)
-        {
-          counter++;
-          dfs(i, visited);
-        }
-      }
-
-      check_validaty();
-      std::cout << "# counter: " << counter << std::endl;
-      std::cout << "# isitOK? :" << isValid << std::endl;
-      std::cout << "# initial cost: " << current_cost << std::endl;
-    }
     void update(std::vector<Operation> operations)
     {
-      if (operations.size() >= 300 && false)
-      {
-        update_recalc(operations);
-      }
-      else
-      {
-        update_diff(operations);
-      }
+      update_diff(operations);
     }
     void update_diff(std::vector<Operation> operations)
     {
@@ -234,15 +151,18 @@ namespace iopddl
       {
         max_time = std::max(max_time, (int)node.interval.second + 1);
       }
+      seg_size = max_time;
       std::vector<TotalUsage> seg_data(max_time);
       for (int i = 0; i < problem.vertexs.size(); i++)
       {
         seg_data[problem.vertexs[i].interval.first] += problem.vertexs[i].selectables[solution[i]].usage;
         seg_data[problem.vertexs[i].interval.second] -= problem.vertexs[i].selectables[solution[i]].usage;
       }
+      total_memory_usage = seg_data[0];
       for (int i = 1; i < max_time; i++)
       {
         seg_data[i] += seg_data[i - 1];
+        total_memory_usage += seg_data[i];
       }
       seg = atcoder::lazy_segtree<TotalUsage, op, e, TotalUsage, mapping, composition, id>(seg_data);
       check_validaty();
@@ -271,10 +191,15 @@ namespace iopddl
     return state;
   }
 
+  Solution create_feasible_solution(const ProblemInstance &problem)
+  {
+    return Solution();
+  };
+
   absl::StatusOr<Solution> Solver::Solve(const Problem &_problem,
                                          absl::Duration _timeout)
   {
-#define output(x) // std::cerr << x << std::endl
+#define output(x) std::cerr << x << std::endl
     const absl::Time start_time = absl::Now();
     std::cout << "# Entered Solver::Solve function at: " << start_time << std::endl;
 
@@ -286,6 +211,8 @@ namespace iopddl
 
     ProblemInstance problem = convertToProblemInstance(_problem);
     std::cout << "# Convertion to problem instance finished: " << absl::ToDoubleSeconds(absl::Now() - start_time) << std::endl;
+
+    const int timeout_seconds = absl::ToInt64Seconds(timeout);
 #pragma omp parallel for
     for (int core = 0; core < number_of_cores; ++core)
     {
@@ -301,6 +228,8 @@ namespace iopddl
         TotalCost cur_best_cost = std::numeric_limits<TotalCost>::max();
         std::optional<Solution> cur_best_solution;
 
+        absl::Time iteration_start = absl::Now();
+
         absl::Time last_updated = absl::Now();
         absl::Time last_output = absl::Now() - absl::Seconds(10);
 
@@ -308,7 +237,7 @@ namespace iopddl
         int accepted = 0;
         std::map<int, int> scores;
 
-        while (absl::Now() - start_time < timeout && absl::Now() - last_updated < absl::Seconds(10))
+        while (absl::Now() - start_time < timeout && (absl::Now() - last_updated < absl::Seconds(5) || absl::Now() - iteration_start < absl::Seconds(60)))
         {
 
           auto current = absl::Now();
@@ -339,59 +268,53 @@ namespace iopddl
           targets.push_back(Operation{node, selection});
           prevs.push_back(Operation{node, old});
 
-          if (vertex.selectables[selection].connection_costs.size() >= 2)
+          const auto &connection_costs = vertex.selectables[selection].connection_costs;
+          int no_fix_allow = (xor64() % 10 == 0);
+          for (const auto &x : connection_costs)
           {
-            const auto &connection_costs = vertex.selectables[selection].connection_costs;
-            for (const auto &x : connection_costs)
+            int target_node = x.first;
+            if (problem.vertexs[target_node].selectables[0].connection_costs.size() > vertex.selectables[selection].connection_costs.size())
             {
-              int target_node = x.first;
-              std::vector<int> cost_oks;
-              bool no_fix = false;
-              int priority = 100;
-              const auto &costs = x.second;
-              const size_t costs_size = costs.size();
-              for (int j = 0; j < costs_size; ++j)
-              {
-                int go = costs[j] / (TICK / 10);
-                if (go < priority)
-                {
-                  priority = go;
-                  no_fix = false;
-                  cost_oks.clear();
-                }
-                if (go == priority)
-                {
-                  if (state.solution[target_node] == j)
-                  {
-                    no_fix = true;
-                  }
-                  cost_oks.push_back(j);
-                }
-              }
-              if (no_fix)
-              {
-                continue;
-              }
-              if (priority != 0)
-              {
-                continue;
-              }
-              int target_selection = cost_oks[0];
-              const auto &target_vertex = problem.vertexs[target_node];
-              const auto &target_selectables = target_vertex.selectables;
-              const Usage min_usage = target_selectables[target_selection].usage;
-              for (int j = 1; j < cost_oks.size(); ++j)
-              {
-                if (target_selectables[cost_oks[j]].usage < min_usage)
-                {
-                  target_selection = cost_oks[j];
-                }
-              }
-              targets.push_back(Operation{target_node, target_selection});
-              prevs.push_back(Operation{target_node, state.solution[target_node]});
+              continue;
             }
+            std::vector<int> cost_oks;
+            bool no_fix = false;
+            const auto &costs = x.second;
+            const size_t costs_size = costs.size();
+            for (int j = 0; j < costs_size; ++j)
+            {
+              int go = costs[j] / (TICK / 10);
+              if (go == 0)
+              {
+                if (state.solution[target_node] == j)
+                {
+                  no_fix = true;
+                }
+                cost_oks.push_back(j);
+              }
+            }
+            if (no_fix && no_fix_allow == false)
+            {
+              continue;
+            }
+            if (cost_oks.size() == 0)
+              continue;
+            int target_selection = cost_oks[0];
+            const auto &target_vertex = problem.vertexs[target_node];
+            const auto &target_selectables = target_vertex.selectables;
+            const Usage min_usage = target_selectables[target_selection].usage;
+            for (int j = 1; j < cost_oks.size(); ++j)
+            {
+              if (target_selectables[cost_oks[j]].usage < min_usage)
+              {
+                target_selection = cost_oks[j];
+              }
+            }
+            targets.push_back(Operation{target_node, target_selection});
+            prevs.push_back(Operation{target_node, state.solution[target_node]});
           }
-          TotalCost old_cost = state.get_cost();
+
+          TotalCost old_cost = state.current_cost;
           scores[targets.size()]++;
           state.update(targets);
           if (!state.isValid)
@@ -399,12 +322,17 @@ namespace iopddl
             state.update(prevs);
             continue;
           }
-          TotalCost new_cost = state.get_cost();
+          TotalCost new_cost = state.current_cost;
           TotalCost cost_diff = new_cost - old_cost;
 
           if (cost_diff > 0)
           {
-            if (((cost_diff >= state.current_cost / 100000 || xor64() % 1000 <= 990) && (xor64() % 1000000 != 0)))
+            if (cost_diff >= (long long)1e17)
+            {
+              state.update(prevs);
+              continue;
+            }
+            if (cost_diff <= (long long)1e17 && xor64() % 1000 <= 995)
             {
               // revert.
               state.update(prevs);
@@ -421,9 +349,7 @@ namespace iopddl
             if (current - last_output > absl::Seconds(1))
             {
               last_output = current;
-              output("# Found solution with cost: " << cur_best_cost);
-              output("# Time from start: " << absl::ToDoubleSeconds(current - start_time));
-              output("# Trial/accepted: " << trial << "/" << accepted);
+              output("# " << core << ": Found solution with cost: " << cur_best_cost);
             }
           }
           accepted++;
@@ -438,13 +364,9 @@ namespace iopddl
         output("# Final cost: " << cur_best_cost);
         output("# Time from start: " << absl::ToDoubleSeconds(absl::Now() - start_time));
         output("# Trial/accepted: " << trial << "/" << accepted);
-        for (auto x : scores)
+        if (global_best_cost > cur_best_cost)
         {
-          output("# " << x.first << " : " << x.second);
-        }
-        if (global_best_cost > state.current_cost)
-        {
-          global_best_cost = state.current_cost;
+          global_best_cost = cur_best_cost;
           global_best_solution = cur_best_solution;
         }
       }
@@ -464,7 +386,6 @@ namespace iopddl
     }
     std::cout << "# Final cost: " << the_best << std::endl;
 
-    /*
     // validate solution.
     absl::StatusOr<TotalCost> verify_result = Evaluate(_problem, the_best_solution.value());
     if (verify_result.ok() == false || verify_result.value() != the_best)
@@ -472,7 +393,6 @@ namespace iopddl
       std::cerr << "# Verification failed." << std::endl;
       return absl::InvalidArgumentError("Verification failed.");
     }
-    */
     absl::Time current_time = absl::Now();
     std::cout << "# Exiting Solver::solve at: " << current_time << std::endl;
     std::cout << "# Elapsed: " << absl::ToDoubleSeconds(current_time - start_time) << std::endl;

@@ -1,0 +1,30 @@
+# core: 0 final_cost: 25087979
+# core: 1 final_cost: 43064758
+# core: 2 final_cost: 17696063
+# core: 3 final_cost: 83342414
+# core: 4 final_cost: 33456943
+# core: 5 final_cost: 20902707
+# Final cost: 17696063
+# Exiting Solver::solve at: 2025-02-24T20:48:27.530134496+09:00
+# Elapsed: 119.005
+
+# core: 0 final_cost: 47557584
+# core: 1 final_cost: 46166244
+# core: 2 final_cost: 18000119
+# core: 3 final_cost: 23475841
+# core: 4 final_cost: 18388485
+# core: 5 final_cost: 17148928
+# Final cost: 17148928
+# Exiting Solver::solve at: 2025-02-24T21:33:36.660845305+09:00
+# Elapsed: 119.004
+
+# Best.
+# core: 0 final_cost: 35222932
+# core: 1 final_cost: 30916027
+# core: 2 final_cost: 36598149
+# core: 3 final_cost: 11611293
+# core: 4 final_cost: 11290184
+# core: 5 final_cost: 31668104
+# Final cost: 11290184
+# Exiting Solver::solve at: 2025-02-25T23:07:55.070467854+09:00
+# Elapsed: 119.005
