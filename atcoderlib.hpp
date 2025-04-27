@@ -1,3 +1,6 @@
+// AC(AtCoder) library, available at https://github.com/atcoder/ac-library
+// Licensed under CC0 1.0 Universal license.
+
 #ifndef ATCODER_LAZYSEGTREE_HPP
 #define ATCODER_LAZYSEGTREE_HPP 1
 
